@@ -1,8 +1,8 @@
 from django.shortcuts import render, get_object_or_404
-from .models import Post
+from .models import Post, Comment
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.generic import ListView
-from .forms import EmailPostForm
+from .forms import EmailPostForm, CommentForm
 from django.core.mail import send_mail
 
 
@@ -34,7 +34,31 @@ def post_detail(request, year, month, day, post):
                              publish__year=year,
                              publish__month=month,
                              publish__day=day)
-    return render(request, 'blog/post/detail.html', {'post': post})
+
+    # 处理评论内容
+    comments = post.comments.filter(active=True)
+
+    new_comment = None
+
+    if request.method == 'POST':
+        # 将用户提交的数据填入表单
+        comment_form = CommentForm(data=request.POST)
+        # 验证表单有效性
+        if comment_form.is_valid():
+            # 通过调用save()实例化Comment模型对象,但暂不保存至数据库，
+            # 方便后续修改，避免反复提交
+            new_comment = comment_form.save(commit=False)
+            # 将评论与当前文章绑定
+            new_comment.post = post
+            new_comment.save()
+    else:
+        comment_form = CommentForm()
+
+    return render(request, 'blog/post/detail.html',
+                  {'post': post,
+                   'comment_form': comment_form,
+                   'new_comment': new_comment,
+                   'comments': comments})
 
 
 def post_share(request, post_id):
